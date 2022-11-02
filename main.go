@@ -24,8 +24,8 @@ const (
 )
 
 type feed struct {
-	Currencies string `yaml:"currencies"`
-	Address    string `yaml:"address"`
+	Tokens  string `yaml:"tokens"`
+	Address string `yaml:"address"`
 }
 
 type feedConfig struct {
@@ -82,38 +82,38 @@ func subscribeBlocks(ctx context.Context, client *ethclient.Client, wg *sync.Wai
 	}
 }
 
-func logFeedError(feedHexAddress, feedCurrencies, msg string, err error) {
+func logFeedError(feedHexAddress, tokens, msg string, err error) {
 	log.WithFields(log.Fields{
 		"feedAddress": feedHexAddress,
-		"currencies":  feedCurrencies,
+		"tokens":      tokens,
 	}).Errorf("%s: %s", msg, err)
 }
 
-func subscribeEvents(ctx context.Context, client *ethclient.Client, feedHexAddress, currencies string, wg *sync.WaitGroup) {
+func subscribeEvents(ctx context.Context, client *ethclient.Client, feedHexAddress, tokens string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	proxyAddress := common.HexToAddress(feedHexAddress)
 	proxyInstance, err := proxy.NewProxy(proxyAddress, client)
 	if err != nil {
-		logFeedError(feedHexAddress, currencies, "Failed acquiring proxy instance", err)
+		logFeedError(feedHexAddress, tokens, "Failed acquiring proxy instance", err)
 		return
 	}
 
 	aggregatorAddress, err := proxyInstance.Aggregator(nil)
 	if err != nil {
-		logFeedError(feedHexAddress, currencies, "Failed acquiring aggregator address", err)
+		logFeedError(feedHexAddress, tokens, "Failed acquiring aggregator address", err)
 		return
 	}
 
 	aggregatorInstance, err := aggregator.NewAggregator(aggregatorAddress, client)
 	if err != nil {
-		logFeedError(feedHexAddress, currencies, "Failed acquiring aggregator instance", err)
+		logFeedError(feedHexAddress, tokens, "Failed acquiring aggregator instance", err)
 		return
 	}
 
 	aggregatorDecimals, err := aggregatorInstance.Decimals(nil)
 	if err != nil {
-		logFeedError(feedHexAddress, currencies, "Failed acquiring decimals", err)
+		logFeedError(feedHexAddress, tokens, "Failed acquiring decimals", err)
 		return
 	}
 
@@ -124,25 +124,25 @@ func subscribeEvents(ctx context.Context, client *ethclient.Client, feedHexAddre
 	ansChan := make(chan *aggregator.AggregatorAnswerUpdated)
 	sub, err := aggregatorInstance.WatchAnswerUpdated(nil, ansChan, nil, nil)
 	if err != nil {
-		logFeedError(feedHexAddress, currencies, "Failed subscribing to price updates", err)
+		logFeedError(feedHexAddress, tokens, "Failed subscribing to price updates", err)
 		return
 	}
 
 	log.WithFields(log.Fields{
 		"feedAddress": feedHexAddress,
-		"currencies":  currencies,
+		"tokens":  tokens,
 	}).Info("Monitoring price")
 	for {
 		select {
 		case err := <-sub.Err():
-			logFeedError(feedHexAddress, currencies, "Failed while listening for events", err)
+			logFeedError(feedHexAddress, tokens, "Failed while listening for events", err)
 			return
 		case <-ctx.Done():
 			return
 		case ans := <-ansChan:
 			newPrice := new(big.Float).Quo(new(big.Float).SetInt(ans.Current), decimalsDivFloat)
 			log.WithFields(log.Fields{
-				"currencies": currencies,
+				"tokens": tokens,
 				"price":      newPrice.Text('f', int(aggregatorDecimals)),
 			}).Info("New price")
 		}
