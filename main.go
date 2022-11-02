@@ -23,13 +23,13 @@ const (
 	queryTimeout = 30 * time.Second
 )
 
-type feed struct {
+type feedData struct {
 	Tokens  string `yaml:"tokens"`
 	Address string `yaml:"address"`
 }
 
 type feedConfig struct {
-	Feeds []feed `yaml:"feeds"`
+	Feeds []feedData `yaml:"feeds"`
 }
 
 func parseFeedConfig(configFileName string) (*feedConfig, error) {
@@ -130,7 +130,7 @@ func subscribeEvents(ctx context.Context, client *ethclient.Client, feedHexAddre
 
 	log.WithFields(log.Fields{
 		"feedAddress": feedHexAddress,
-		"tokens":  tokens,
+		"tokens":      tokens,
 	}).Info("Monitoring price")
 	for {
 		select {
@@ -143,7 +143,7 @@ func subscribeEvents(ctx context.Context, client *ethclient.Client, feedHexAddre
 			newPrice := new(big.Float).Quo(new(big.Float).SetInt(ans.Current), decimalsDivFloat)
 			log.WithFields(log.Fields{
 				"tokens": tokens,
-				"price":      newPrice.Text('f', int(aggregatorDecimals)),
+				"price":  newPrice.Text('f', int(aggregatorDecimals)),
 			}).Info("New price")
 		}
 	}
@@ -174,12 +174,12 @@ func main() {
 	}
 
 	wg := sync.WaitGroup{}
-	wg.Add(len(feedConf.Feeds))
+	wg.Add(len(feedConf.Feeds) + 1)
 
 	go subscribeBlocks(termCtx, client, &wg)
-	go subscribeEvents(termCtx, client, "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419", "ETH / USD", &wg)
-	go subscribeEvents(termCtx, client, "0xdc530d9457755926550b59e8eccdae7624181557", "LINK / ETH", &wg)
-	go subscribeEvents(termCtx, client, "0xee9f2375b4bdf6387aa8265dd4fb8f16512a1d46", "USDT / ETH", &wg)
+	for _, feed := range feedConf.Feeds {
+		go subscribeEvents(termCtx, client, feed.Address, feed.Tokens, &wg)
+	}
 
 	wg.Wait()
 }
