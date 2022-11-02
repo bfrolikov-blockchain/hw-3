@@ -1,0 +1,7 @@
+feeds:
+  - currencies: "ETH / USD"
+    address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+  - currencies: "LINK / ETH"
+    address: "0xdc530d9457755926550b59e8eccdae7624181557"
+  - currencies: "USDT / ETH"
+    address: "0xee9f2375b4bdf6387aa8265dd4fb8f16512a1d46"

@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/ethereum/go-ethereum v1.10.25
 	github.com/sirupsen/logrus v1.9.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (

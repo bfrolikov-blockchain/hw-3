@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 	"hw-3/aggregator"
 	"hw-3/proxy"
 	"math/big"
@@ -19,8 +21,32 @@ import (
 
 const (
 	queryTimeout = 30 * time.Second
-	subscribers  = 4
 )
+
+type feed struct {
+	Currencies string `yaml:"currencies"`
+	Address    string `yaml:"address"`
+}
+
+type feedConfig struct {
+	Feeds []feed `yaml:"feeds"`
+}
+
+func parseFeedConfig(configFileName string) (*feedConfig, error) {
+	feedConfigFile, err := os.Open(configFileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed opening config file %s: %w", configFileName, err)
+	}
+	defer feedConfigFile.Close()
+
+	feedConf := feedConfig{}
+	feedConfigDecoder := yaml.NewDecoder(feedConfigFile)
+	err = feedConfigDecoder.Decode(&feedConf)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding feed info from file %s: %w", configFileName, err)
+	}
+	return &feedConf, nil
+}
 
 func subscribeBlocks(ctx context.Context, client *ethclient.Client, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -124,6 +150,12 @@ func subscribeEvents(ctx context.Context, client *ethclient.Client, feedHexAddre
 }
 
 func main() {
+	feedConf, err := parseFeedConfig("feed.yaml")
+	if err != nil {
+		log.Errorf("Failed parsing feed config: %s", err)
+		return
+	}
+
 	background := context.Background()
 	termCtx, termCancel := context.WithCancel(background)
 	sigs := make(chan os.Signal, 1)
@@ -137,11 +169,12 @@ func main() {
 	client, err := ethclient.DialContext(timeoutCtx, os.Getenv("ALCHEMY_URL"))
 	timeoutCancel()
 	if err != nil {
-		log.Fatalf("Failed dialing node: %s", err)
+		log.Errorf("Failed dialing node: %s", err)
+		return
 	}
 
 	wg := sync.WaitGroup{}
-	wg.Add(subscribers)
+	wg.Add(len(feedConf.Feeds))
 
 	go subscribeBlocks(termCtx, client, &wg)
 	go subscribeEvents(termCtx, client, "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419", "ETH / USD", &wg)
